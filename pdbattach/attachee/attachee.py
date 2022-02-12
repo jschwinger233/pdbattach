@@ -137,7 +137,7 @@ class Attachee:
         pokebytes(
             self.pid,
             self._allocated_address,
-            b'print(111)',
+            f'from pdbattach import rpdb; rpdb.set_trace("/tmp/debug-{self.pid}.unix")'.encode(), # noqa
         )
         regs = copy.copy(self._saved_regs)
         regs.rax = 0x527C0A
