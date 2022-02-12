@@ -2,16 +2,12 @@ import socket
 import selectors
 
 from ..eventloop import EventLoop
-from ..exchange import Exchange, event
+from ..exchange import Subscriber, Exchange, event
 
 
-class Client:
+class Client(Subscriber):
     def __init__(self):
         self._unix_sock = None
-
-    def recv(self, event):
-        event_callback = getattr(self, "_on_" + event.__name__)
-        event_callback(event)
 
     def _on_RemotePdbUp(self, event: event.RemotePdbUp):
         self._unix_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -23,10 +19,15 @@ class Client:
             self.callback,
         )
 
+    def _on_PtyDataReceived(self, event: event.PtyDataReceived):
+        if not event.buf:
+            self._unix_sock.close()
+            return
+        self._unix_sock.send(event.buf)
+
     def callback(self, _):
         buf = self._unix_sock.read(40960)
         if not buf:
-            buf = 'EOF'
             EventLoop().unregister(self._unix_sock)
             self._unix_sock.close()
 

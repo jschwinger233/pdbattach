@@ -21,6 +21,11 @@ class rPdb(Pdb):
         self.clear_all_breaks()
         return super().do_quit(*args, **kws)
 
+    def do_EOF(self, *args, **kws):
+        self.conn.close()
+        self.clear_all_breaks()
+        return super().do_EOF(*args, **kws)
+
     do_de = do_detach
     do_q = do_exit = do_quit
 
