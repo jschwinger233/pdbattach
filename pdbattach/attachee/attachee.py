@@ -8,6 +8,7 @@ import syscall
 
 from .utils import pokebytes
 from ..eventloop import EventLoop
+from ..exchange import Exchange, event
 
 
 class State(Enum):
@@ -27,20 +28,27 @@ class Attachee:
         self._state = 0
 
     def start_inject(self):
-        eventloop = EventLoop()
         signal.pthread_sigmask(signal.SIG_BLOCK, [signal.SIGCHLD])
         self._signalfd = syscall.signalfd(
             -1,
             [signal.SIGCHLD],
             syscall.SFD_NONBLOCK,
         )
-        eventloop.register(self._signalfd, selectors.EVENT_READ, self.callback)
+        EventLoop().register(
+            self._signalfd,
+            selectors.EVENT_READ,
+            self.callback,
+        )
 
         syscall.ptrace(syscall.PTRACE_ATTACH, self.pid, 0, 0)
 
     def handle_general_signal(self, signo: int):
         signame = signal.Signal(signo).name
         print(f"got signal {signame}")
+
+    @property
+    def unix_address(self):
+        return f"/tmp/debug-{self.pid}.unix"
 
     def callback(self, fd):
         ssi = syscall.SignalfdSiginfo()
@@ -55,8 +63,8 @@ class Attachee:
             return
 
         os.wait()
-        state_method = getattr(self, "_do_" + State(self._state+1).name)
-        state_method(fd)
+        call = getattr(self, "_do_" + State(self._state + 1).name)
+        call(fd)
         self._state += 1
 
     def _do_call_PyGILState_Ensure(self, fd):
@@ -135,7 +143,7 @@ class Attachee:
         pokebytes(
             self.pid,
             self._allocated_address,
-            f'from pdbattach import rpdb; rpdb.set_trace("/tmp/debug-{self.pid}.unix")'.encode(), # noqa
+            f'from pdbattach import rpdb; rpdb.set_trace("{self.unix_address}")'.encode(),  # noqa
         )
         regs = copy.copy(self._saved_regs)
         regs.rax = 0x527C0A
@@ -149,6 +157,8 @@ class Attachee:
             regs.byref(),
         )
         syscall.ptrace(syscall.PTRACE_CONT, self.pid, 0, 0)
+
+        Exchange().send(event.RemotePdbUp(self.unix_address))
 
     def _do_call_PyGILState_Release(self, fd):
         regs = copy.copy(self._saved_regs)

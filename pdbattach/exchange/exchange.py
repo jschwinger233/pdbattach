@@ -14,4 +14,4 @@ class Exchange:
 
     def send(self, event):
         for sub in self._subs:
-            sub.send(event)
+            sub.recv(event)
