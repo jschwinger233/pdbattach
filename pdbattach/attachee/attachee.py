@@ -11,14 +11,12 @@ from ..eventloop import EventLoop
 
 
 class State(Enum):
-    A = 0
-    B = 1
-    C = 2
-    D = 3
-    E = 4
-    F = 5
-    G = 6
-    H = 7
+    init = 0
+    call_PyGILState_Ensure = 1
+    syscall_mmap = 2
+    call_PyRun_SimpleString = 3
+    call_PyGILState_Release = 4
+    restore_and_detach = 5
 
 
 class Attachee:
@@ -57,11 +55,11 @@ class Attachee:
             return
 
         os.wait()
-        state_method = getattr(self, "_callback_" + State(self._state).name)
+        state_method = getattr(self, "_do_" + State(self._state+1).name)
         state_method(fd)
         self._state += 1
 
-    def _callback_A(self, fd):
+    def _do_call_PyGILState_Ensure(self, fd):
         self._saved_regs = syscall.UserRegsStruct()
         syscall.ptrace(
             syscall.PTRACE_GETREGS, self.pid, 0, self._saved_regs.byref()
@@ -107,7 +105,7 @@ class Attachee:
             0,
         )
 
-    def _callback_B(self, fd):
+    def _do_syscall_mmap(self, fd):
         regs = copy.copy(self._saved_regs)
         regs.rax = syscall.mmap.no
         regs.rdi = 0
@@ -130,7 +128,7 @@ class Attachee:
             0,
         )
 
-    def _callback_C(self, fd):
+    def _do_call_PyRun_SimpleString(self, fd):
         rregs = syscall.UserRegsStruct()
         syscall.ptrace(syscall.PTRACE_GETREGS, self.pid, 0, rregs.byref())
         self._allocated_address = rregs.rax
@@ -152,7 +150,7 @@ class Attachee:
         )
         syscall.ptrace(syscall.PTRACE_CONT, self.pid, 0, 0)
 
-    def _callback_D(self, fd):
+    def _do_call_PyGILState_Release(self, fd):
         regs = copy.copy(self._saved_regs)
         regs.rax = 0x523D87
         regs.rdi = 0x1
@@ -166,7 +164,7 @@ class Attachee:
         )
         syscall.ptrace(syscall.PTRACE_CONT, self.pid, 0, 0)
 
-    def _callback_E(self, fd):
+    def _do_restore_and_detach(self, fd):
         syscall.ptrace(
             syscall.PTRACE_POKEDATA,
             self.pid,
