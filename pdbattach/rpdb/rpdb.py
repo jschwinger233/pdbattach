@@ -16,18 +16,13 @@ class rPdb(Pdb):
         self.clear_all_breaks()
         return super().do_continue(*args, **kws)
 
-    def do_quit(self, *args, **kws):
-        self.conn.shutdown(socket.SHUT_WR)
-        self.clear_all_breaks()
-        return super().do_quit(*args, **kws)
-
     def do_EOF(self, *args, **kws):
         self.conn.shutdown(socket.SHUT_WR)
         self.clear_all_breaks()
         return super().do_EOF(*args, **kws)
 
     do_de = do_detach
-    do_q = do_exit = do_quit
+    do_q = do_exit = do_quit = do_detach
 
 
 def set_trace(address: str):
