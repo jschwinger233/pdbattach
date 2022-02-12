@@ -3,9 +3,14 @@ import dataclasses
 
 @dataclasses.dataclass
 class RemotePdbUp:
-    address: str
+    unix_address: str
 
 
 @dataclasses.dataclass
 class PdbDataReceived:
+    buf: bytes
+
+
+@dataclasses.dataclass
+class PtyDataReceived:
     buf: str

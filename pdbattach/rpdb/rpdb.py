@@ -12,17 +12,17 @@ class rPdb(Pdb):
         return super().__init__(stdin=stream, stdout=stream)
 
     def do_detach(self, *args, **kws):
-        self.conn.close()
+        self.conn.shutdown(socket.SHUT_WR)
         self.clear_all_breaks()
         return super().do_continue(*args, **kws)
 
     def do_quit(self, *args, **kws):
-        self.conn.close()
+        self.conn.shutdown(socket.SHUT_WR)
         self.clear_all_breaks()
         return super().do_quit(*args, **kws)
 
     def do_EOF(self, *args, **kws):
-        self.conn.close()
+        self.conn.shutdown(socket.SHUT_WR)
         self.clear_all_breaks()
         return super().do_EOF(*args, **kws)
 

@@ -22,11 +22,12 @@ class Client(Subscriber):
     def _on_PtyDataReceived(self, event: event.PtyDataReceived):
         if not event.buf:
             self._unix_sock.close()
+            EventLoop().unregister(self._unix_sock)
             return
         self._unix_sock.send(event.buf)
 
     def callback(self, _):
-        buf = self._unix_sock.read(40960)
+        buf = self._unix_sock.recv(40960)
         if not buf:
             EventLoop().unregister(self._unix_sock)
             self._unix_sock.close()

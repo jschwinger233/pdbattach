@@ -1,4 +1,5 @@
 import os
+import time
 import copy
 import signal
 import selectors
@@ -8,7 +9,7 @@ import syscall
 
 from .utils import pokebytes
 from ..eventloop import EventLoop
-from ..exchange import Exchange, event
+from ..exchange import Exchange, event, Subscriber
 
 
 class State(Enum):
@@ -20,7 +21,7 @@ class State(Enum):
     restore_and_detach = 5
 
 
-class Attachee:
+class Attachee(Subscriber):
     def __init__(self, pid):
         self.pid = pid
 
@@ -158,6 +159,7 @@ class Attachee:
         )
         syscall.ptrace(syscall.PTRACE_CONT, self.pid, 0, 0)
 
+        time.sleep(0.1)
         Exchange().send(event.RemotePdbUp(self.unix_address))
 
     def _do_call_PyGILState_Release(self, fd):

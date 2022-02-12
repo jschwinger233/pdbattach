@@ -14,8 +14,9 @@ class Pty(Subscriber):
 
     def _on_PdbDataReceived(self, event: event.PdbDataReceived):
         if not self._initiated:
-            fl = fcntl.fcntl(sys.stdin, fcntl.F_GETFL)
-            fcntl.fcntl(sys.stdin, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+            self._initiated = True
+            fl = fcntl.fcntl(self._stdin, fcntl.F_GETFL)
+            fcntl.fcntl(self._stdin, fcntl.F_SETFL, fl | os.O_NONBLOCK)
             EventLoop().register(
                 self._stdin,
                 selectors.EVENT_READ,
@@ -23,12 +24,13 @@ class Pty(Subscriber):
             )
 
         if not event.buf:
-            event.buf = "EOF"
-            sys.stdin.close()
-        print(event.buf)
+            os.close(self._stdin.fileno())
+            EventLoop().unregister(self._stdin)
+            return
+        print(event.buf.decode(), end='')
 
     def callback(self, _):
-        buf = os.read(sys.stdin.fileno(), 4096)
+        buf = os.read(self._stdin.fileno(), 4096)
         if not buf:
             EventLoop().unregister(self._stdin)
 

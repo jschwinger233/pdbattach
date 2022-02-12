@@ -3,8 +3,9 @@ from ..utils import singleton
 
 class Subscriber:
     def recv(self, event):
-        event_callback = getattr(self, "_on_" + event.__name__)
-        event_callback(event)
+        event_callback = getattr(self, "_on_" + event.__class__.__name__, None)
+        if event_callback:
+            event_callback(event)
 
 
 @singleton
