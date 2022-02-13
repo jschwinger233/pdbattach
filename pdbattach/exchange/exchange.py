@@ -2,10 +2,10 @@ from ..utils import singleton
 
 
 class Subscriber:
-    def recv(self, event):
-        event_callback = getattr(self, "_on_" + event.__class__.__name__, None)
-        if event_callback:
-            event_callback(event)
+    def recv(self, msg):
+        handle = getattr(self, "handle_msg_" + msg.__class__.__name__, None)
+        if handle:
+            handle(msg)
 
 
 @singleton
@@ -19,6 +19,6 @@ class Exchange:
     def detach(self, sub: Subscriber):
         self._subs.remove(sub)
 
-    def send(self, event):
+    def send(self, msg):
         for sub in self._subs:
-            sub.recv(event)
+            sub.recv(msg)

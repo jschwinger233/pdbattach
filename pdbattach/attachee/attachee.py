@@ -10,7 +10,7 @@ import syscall
 from . import elf
 from .utils import pokebytes
 from ..eventloop import EventLoop
-from ..exchange import Exchange, event, Subscriber
+from ..exchange import Exchange, message, Subscriber
 
 
 class State(Enum):
@@ -176,7 +176,7 @@ class Attachee(Subscriber):
         syscall.ptrace(syscall.PTRACE_CONT, self.pid, 0, 0)
 
         time.sleep(0.1)
-        Exchange().send(event.RemotePdbUp(self.unix_address))
+        Exchange().send(message.RemotePdbUp(self.unix_address))
 
     def _do_call_PyGILState_Release(self, fd):
         regs = copy.copy(self._saved_regs)
