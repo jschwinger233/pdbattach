@@ -7,6 +7,7 @@ from enum import Enum
 
 import syscall
 
+from . import elf
 from .utils import pokebytes
 from ..eventloop import EventLoop
 from ..exchange import Exchange, event, Subscriber
@@ -16,17 +17,29 @@ class State(Enum):
     init = 0
     call_PyGILState_Ensure = 1
     syscall_mmap = 2
-    call_PyRun_SimpleString = 3
+    call_PyRun_SimpleStringFlags = 3
     call_PyGILState_Release = 4
     restore_and_detach = 5
 
 
 class Attachee(Subscriber):
-    def __init__(self, pid):
+    def __init__(self, pid, binary_with_symtab=None):
         self.pid = pid
 
         self._signalfd = None
         self._state = 0
+
+        if not binary_with_symtab:
+            binary_with_symtab = f"/proc/{pid}/exe"
+        self._offset_PyGILState_Ensure = elf.search_symbol_offset(
+            binary_with_symtab, "PyGILState_Ensure"
+        )
+        self._offset_PyRun_SimpleStringFlags = elf.search_symbol_offset(
+            binary_with_symtab, "PyRun_SimpleStringFlags"
+        )
+        self._offset_PyGILState_Release = elf.search_symbol_offset(
+            binary_with_symtab, "PyGILState_Release"
+        )
 
     def start_inject(self):
         signal.pthread_sigmask(signal.SIG_BLOCK, [signal.SIGCHLD])
@@ -98,7 +111,7 @@ class Attachee(Subscriber):
             self._next_instruction & ~0xFF | 0xCC,  # int
         )
         regs = copy.copy(self._saved_regs)
-        regs.rax = 0x523CCF
+        regs.rax = self._offset_PyGILState_Ensure
         regs.rsp -= 152
         regs.rbp = regs.rsp
         syscall.ptrace(
@@ -137,7 +150,7 @@ class Attachee(Subscriber):
             0,
         )
 
-    def _do_call_PyRun_SimpleString(self, fd):
+    def _do_call_PyRun_SimpleStringFlags(self, fd):
         rregs = syscall.UserRegsStruct()
         syscall.ptrace(syscall.PTRACE_GETREGS, self.pid, 0, rregs.byref())
         self._allocated_address = rregs.rax
@@ -147,7 +160,7 @@ class Attachee(Subscriber):
             f'from pdbattach import rpdb; rpdb.set_trace("{self.unix_address}")'.encode(),  # noqa
         )
         regs = copy.copy(self._saved_regs)
-        regs.rax = 0x527C0A
+        regs.rax = self._offset_PyRun_SimpleStringFlags
         regs.rdi = self._allocated_address
         regs.rsp -= 152
         regs.rbp = regs.rsp
@@ -164,7 +177,7 @@ class Attachee(Subscriber):
 
     def _do_call_PyGILState_Release(self, fd):
         regs = copy.copy(self._saved_regs)
-        regs.rax = 0x523D87
+        regs.rax = self._offset_PyGILState_Release
         regs.rdi = 0x1
         regs.rsp -= 152  # magic
         regs.rbp = regs.rsp

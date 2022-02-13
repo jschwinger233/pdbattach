@@ -26,6 +26,7 @@ setup(
     python_requires=">=3.8",
     install_requires=[
         "syscall@https://github.com/jschwinger233/py-linux-syscall/zipball/main#egg=syscall",
+        "pyelftools",
     ],
     entry_points={
         "console_scripts": [
