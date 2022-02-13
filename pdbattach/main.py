@@ -1,4 +1,4 @@
-import sys
+import argparse
 
 from .exchange import Exchange
 from .eventloop import EventLoop
@@ -8,9 +8,23 @@ from .pty import Pty
 
 
 def main():
-    pid = int(sys.argv[1])
+    parser = argparse.ArgumentParser(
+        description="pdb attach a running Python process."
+    )
+    parser.add_argument(
+        "pid",
+        type=int,
+        help="a Python process",
+    )
+    parser.add_argument(
+        "-s",
+        "--symtab",
+        dest="symtab",
+        help="the debug version Python binary with symtab",
+    )
+    args = parser.parse_args()
 
-    attachee = Attachee(pid)
+    attachee = Attachee(args.pid, args.symtab)
     pdb_client = Client()
     pty = Pty()
 
