@@ -27,7 +27,7 @@ class Pty(Subscriber):
             os.close(self._stdin.fileno())
             EventLoop().unregister(self._stdin)
             return
-        print(event.buf.decode(), end='')
+        print(event.buf.decode(), end='', flush=True)
 
     def callback(self, _):
         buf = os.read(self._stdin.fileno(), 4096)
