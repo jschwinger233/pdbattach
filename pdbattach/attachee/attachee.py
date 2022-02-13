@@ -19,10 +19,13 @@ class State(Enum):
     syscall_mmap = 2
     call_PyRun_SimpleStringFlags = 3
     call_PyGILState_Release = 4
-    restore_and_detach = 5
+    syscall_munmap = 5
+    restore_and_detach = 6
 
 
 class Attachee(Subscriber):
+    ALLOCATE_SIZE_IN_BYTE = 1024
+
     def __init__(self, pid, binary_with_symtab=None):
         self.pid = pid
 
@@ -131,7 +134,7 @@ class Attachee(Subscriber):
         regs = copy.copy(self._saved_regs)
         regs.rax = syscall.mmap.no
         regs.rdi = 0
-        regs.rsi = 1024  # 1024 bytes
+        regs.rsi = self.ALLOCATE_SIZE_IN_BYTE
         regs.rdx = syscall.PROT_READ | syscall.PROT_WRITE
         regs.r10 = syscall.MAP_PRIVATE | syscall.MAP_ANONYMOUS
         regs.r8 = 0
@@ -188,6 +191,29 @@ class Attachee(Subscriber):
             regs.byref(),
         )
         syscall.ptrace(syscall.PTRACE_CONT, self.pid, 0, 0)
+
+    def _do_syscall_munmap(self, fd):
+        regs = copy.copy(self._saved_regs)
+        regs.rax = syscall.munmap.no
+        regs.rdi = self._allocated_address
+        regs.rsi = self.ALLOCATE_SIZE_IN_BYTE
+        regs.rdx = 0
+        regs.r10 = 0
+        regs.r8 = 0
+        regs.r9 = 0
+        regs.rip -= 2
+        syscall.ptrace(
+            syscall.PTRACE_SETREGS,
+            self.pid,
+            0,
+            regs.byref(),
+        )
+        syscall.ptrace(
+            syscall.PTRACE_SINGLESTEP,
+            self.pid,
+            0,
+            0,
+        )
 
     def _do_restore_and_detach(self, fd):
         syscall.ptrace(
