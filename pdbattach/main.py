@@ -14,17 +14,11 @@ def main():
     parser.add_argument(
         "pid",
         type=int,
-        help="a Python process",
-    )
-    parser.add_argument(
-        "-s",
-        "--symtab",
-        dest="symtab",
-        help="the debug version Python binary with symtab",
+        help="a Python process pid",
     )
     args = parser.parse_args()
 
-    attachee = Attachee(args.pid, args.symtab)
+    attachee = Attachee(args.pid)
     pdb_client = Client()
     pty = Pty()
 

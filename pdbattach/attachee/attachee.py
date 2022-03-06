@@ -26,22 +26,21 @@ class State(Enum):
 class Attachee(Subscriber):
     ALLOCATE_SIZE_IN_BYTE = 1024
 
-    def __init__(self, pid, binary_with_symtab=None):
+    def __init__(self, pid):
         self.pid = pid
 
         self._signalfd = None
         self._state = 0
 
-        if not binary_with_symtab:
-            binary_with_symtab = f"/proc/{pid}/exe"
+        binary = f"/proc/{pid}/exe"
         self._offset_PyGILState_Ensure = elf.search_symbol_offset(
-            binary_with_symtab, "PyGILState_Ensure"
+            binary, "PyGILState_Ensure"
         )
         self._offset_PyRun_SimpleStringFlags = elf.search_symbol_offset(
-            binary_with_symtab, "PyRun_SimpleStringFlags"
+            binary, "PyRun_SimpleStringFlags"
         )
         self._offset_PyGILState_Release = elf.search_symbol_offset(
-            binary_with_symtab, "PyGILState_Release"
+            binary, "PyGILState_Release"
         )
 
     def start_inject(self):
@@ -165,6 +164,7 @@ class Attachee(Subscriber):
         regs = copy.copy(self._saved_regs)
         regs.rax = self._offset_PyRun_SimpleStringFlags
         regs.rdi = self._allocated_address
+        regs.rsi = 0
         regs.rsp -= 152
         regs.rbp = regs.rsp
         syscall.ptrace(
