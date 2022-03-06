@@ -1,10 +1,6 @@
 # pdbattach
+
 Attach pdb to a running Python process.
-
-## Requirements
-
-1. The `.symtab` section in the binary is required; or please prepare the corresponding debug version of CPython, we also accept separate debug file.
-2. The CPython which is running the attached process must pip install the `pdbattach`; this calls for attention when there are multiple versions of CPython installed.
 
 ## Install
 
@@ -14,11 +10,19 @@ python3.8 -mpip install git+https://github.com/jschwinger233/pdbattach.git
 
 ## Usage
 
-Suppose we have only one `python3.9` process running with command `python3.9 test.py`, and we want to attach it using the separate debug file `/usr/bin/python3.9-dbg`:
+Suppose we have a `python3.9` process running with command `python3.9 test.py`, where `test.py` is a simple script:
 
+```python
+import time
+for i in range(1000):
+    print(i)
+    time.sleep(10)
+```
+
+then we can attach it:
 
 ```bash
-$ sudo pdbattach --symtab /usr/bin/python3.9-dbg $(pidof python3.9)
+$ sudo pdbattach $(pgrep -f test.py)
 --Return--
 > <string>(1)<module>()->None
 (Pdb) b test.py:3
