@@ -5,7 +5,7 @@ Attach pdb to a running Python process.
 ## Install
 
 ```
-python3.8 -mpip install git+https://github.com/jschwinger233/pdbattach.git
+python3.8 -m pip install git+https://github.com/jschwinger233/pdbattach.git
 ```
 
 ## Usage
