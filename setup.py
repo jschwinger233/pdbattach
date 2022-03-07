@@ -7,7 +7,7 @@ setup(
     name="pdbattach",
     packages=find_packages(),
     include_package_data=True,
-    version="0.0.2",
+    version="0.0.3",
     license="MIT",
     description="pdb attach a Python process",
     long_description=long_description,

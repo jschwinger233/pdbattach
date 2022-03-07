@@ -40,3 +40,9 @@ Breakpoint 1 at /home/gray/Dropbox/mac.local/Documents/src/github.com/jschwinger
 [EOF]
 (Pdb) q
 ```
+
+## Known Issues
+
+1. pdb doesn't work properly under multi-thread scenarios. See [issue](https://bugs.python.org/issue41571).
+2. ptrace(2) relies on `struct user_regs_struct` whose definition varies across platforms, therefore running pdbattach inside a container (e.g. from docker.io/python:3 image) to attach a host process will cause segmentation fault. See [issue](https://github.com/jschwinger233/pdbattach/issues/4).
+3. Current version doesn't apply dynamic symbol reloc algorithm, therefore attaching a Python process whose executable is built from source will cause segmentation fault. See [issue](https://github.com/jschwinger233/pdbattach/issues/3).
