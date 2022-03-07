@@ -1,19 +1,21 @@
 import os
+import enum
 import time
 import copy
 import signal
+import shutil
 import selectors
-from enum import Enum
 
 import syscall
 
 from . import elf
+from ..rpdb import rpdb
 from .utils import pokebytes
 from ..eventloop import EventLoop
 from ..exchange import Exchange, message, Subscriber
 
 
-class State(Enum):
+class State(enum.Enum):
     init = 0
     call_PyGILState_Ensure = 1
     syscall_mmap = 2
@@ -156,10 +158,11 @@ class Attachee(Subscriber):
         rregs = syscall.UserRegsStruct()
         syscall.ptrace(syscall.PTRACE_GETREGS, self.pid, 0, rregs.byref())
         self._allocated_address = rregs.rax
+        shutil.copy(rpdb.__file__, f'/proc/{self.pid}/cwd')
         pokebytes(
             self.pid,
             self._allocated_address,
-            f'from pdbattach import rpdb; rpdb.set_trace("{self.unix_address}")'.encode(),  # noqa
+            f'import sys; sys.path.insert(0, ""); import rpdb; rpdb.set_trace("{self.unix_address}")'.encode(),  # noqa
         )
         regs = copy.copy(self._saved_regs)
         regs.rax = self._offset_PyRun_SimpleStringFlags

@@ -21,8 +21,7 @@ class rPdb(Pdb):
         self.clear_all_breaks()
         return super().do_EOF(*args, **kws)
 
-    do_de = do_detach
-    do_q = do_exit = do_quit = do_detach
+    do_q = do_exit = do_quit = do_de = do_detach
 
 
 def set_trace(address: str):
