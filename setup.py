@@ -7,7 +7,7 @@ setup(
     name="pdbattach",
     packages=find_packages(),
     include_package_data=True,
-    version="0.0.3",
+    version="0.0.4",
     license="MIT",
     description="pdb attach a Python process",
     long_description=long_description,
@@ -26,7 +26,6 @@ setup(
     python_requires=">=3.8",
     install_requires=[
         "syscall@https://github.com/jschwinger233/py-linux-syscall/zipball/main#egg=syscall==0.0.2",
-        "pyelftools",
     ],
     entry_points={
         "console_scripts": [

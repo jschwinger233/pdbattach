@@ -28,21 +28,20 @@ class State(enum.Enum):
 class Attachee(Subscriber):
     ALLOCATE_SIZE_IN_BYTE = 1024
 
-    def __init__(self, pid):
+    def __init__(self, pid: int):
         self.pid = pid
 
         self._signalfd = None
         self._state = 0
 
-        binary = f"/proc/{pid}/exe"
         self._offset_PyGILState_Ensure = elf.search_symbol_offset(
-            binary, "PyGILState_Ensure"
+            pid, "PyGILState_Ensure"
         )
         self._offset_PyRun_SimpleStringFlags = elf.search_symbol_offset(
-            binary, "PyRun_SimpleStringFlags"
+            pid, "PyRun_SimpleStringFlags"
         )
         self._offset_PyGILState_Release = elf.search_symbol_offset(
-            binary, "PyGILState_Release"
+            pid, "PyGILState_Release"
         )
 
     def start_inject(self):
