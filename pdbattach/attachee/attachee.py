@@ -157,7 +157,7 @@ class Attachee(Subscriber):
         rregs = syscall.UserRegsStruct()
         syscall.ptrace(syscall.PTRACE_GETREGS, self.pid, 0, rregs.byref())
         self._allocated_address = rregs.rax
-        shutil.copy(rpdb.__file__, f'/proc/{self.pid}/cwd')
+        shutil.copy(rpdb.__file__, f"/proc/{self.pid}/cwd")
         pokebytes(
             self.pid,
             self._allocated_address,
@@ -178,7 +178,9 @@ class Attachee(Subscriber):
         syscall.ptrace(syscall.PTRACE_CONT, self.pid, 0, 0)
 
         time.sleep(0.1)
-        Exchange().send(message.RemotePdbUp(self.unix_address))
+        Exchange().send(
+            message.RemotePdbUp(f"/proc/{self.pid}/root/{self.unix_address}")
+        )
 
     def _do_call_PyGILState_Release(self, fd):
         regs = copy.copy(self._saved_regs)

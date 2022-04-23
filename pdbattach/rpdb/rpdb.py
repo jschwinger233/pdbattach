@@ -8,16 +8,18 @@ from contextlib import suppress
 class rPdb(Pdb):
     def __init__(self, conn):
         self.conn = conn
-        stream = conn.makefile("rw")
-        return super().__init__(stdin=stream, stdout=stream)
+        self.stream = conn.makefile("rw")
+        return super().__init__(stdin=self.stream, stdout=self.stream)
 
     def do_detach(self, *args, **kws):
-        self.conn.shutdown(socket.SHUT_WR)
+        self.stream.close()
+        self.conn.close()
         self.clear_all_breaks()
         return super().do_continue(*args, **kws)
 
     def do_EOF(self, *args, **kws):
-        self.conn.shutdown(socket.SHUT_WR)
+        self.stream.close()
+        self.conn.close()
         self.clear_all_breaks()
         return super().do_EOF(*args, **kws)
 
