@@ -1,20 +1,50 @@
-from elftools.elf.elffile import ELFFile
+import os
+import subprocess
+from . import print_sym_offset
 
 
-def search_symbol_offset(binary: str, symbol: str) -> int:
-    with open(binary, "rb") as f:
-        elf = ELFFile(f)
-        symtab = elf.get_section_by_name(".dynsym")
-        if not symtab:
-            raise ValueError(f"symtab not found in {binary}")
+def search_symbol_offset(pid: int, symbol: str) -> int:
+    with open(print_sym_offset.__file__) as f:
+        script_code = f.read()
 
-        syms = symtab.get_symbol_by_name(symbol)
-        if not syms:
-            raise ValueError(f'symbol "{symbol}" not found in {binary}')
+    bin_under_mount = os.readlink(f"/proc/{pid}/exe")
 
-        return syms[0]["st_value"]
+    try:
+        process = subprocess.run(
+            [
+                "nsenter",
+                f"--pid=/proc/{pid}/ns/pid",
+                "chroot",
+                f"/proc/{pid}/root",
+                bin_under_mount,
+                "-",
+                symbol,
+            ],
+            capture_output=True,
+            encoding="utf8",
+            check=True,
+            input=script_code,
+        )
+    except subprocess.CalledProcessError as err:
+        print(err.stderr)
+        raise
+
+    parts = process.stdout.split(":")
+    offset, elf, seq = int(parts[0]), parts[1], int(parts[2])
+
+    with open(f"/proc/{pid}/maps") as f:
+        cnt = -1
+        for line in f:
+            if not line.rstrip().endswith(elf):
+                continue
+            cnt += 1
+            if cnt == seq:
+                return offset + int(line.split("-")[0], base=16)
+
+    raise ValueError(f"map not found: elf {elf}, seq {seq}")
 
 
 if __name__ == "__main__":
     import sys
-    print(search_symbol_offset(sys.argv[1], sys.argv[2]))
+
+    print(search_symbol_offset(int(sys.argv[1]), sys.argv[2]))
