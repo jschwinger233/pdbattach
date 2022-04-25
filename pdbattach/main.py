@@ -1,31 +1,42 @@
-import argparse
+import click
+import shutil
 
-from .exchange import Exchange
+from .injector import REPLInjector, SimpleInjector
 from .eventloop import EventLoop
-from .attachee import Attachee
-from .rpdb import Client
-from .pty import Pty
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="pdb attach a running Python process."
-    )
-    parser.add_argument(
-        "pid",
-        type=int,
-        help="a Python process pid",
-    )
-    args = parser.parse_args()
+@click.group(
+    context_settings=dict(help_option_names=["-h", "--help"]),
+    invoke_without_command=True,
+)
+@click.option(
+    "-p",
+    "--pid",
+    help="the Python process to tamper",
+    type=int,
+)
+@click.option(
+    "-c",
+    "--command",
+    help="the command to inject, e.g. -c 'print(2333)'",
+)
+@click.option(
+    "-f",
+    "--filename",
+    help="the script to inject, e.g. -f evil.py",
+    type=click.Path(exists=True, dir_okay=False),
+)
+def main(pid: int, command: str, filename: str):
+    injector_cls = SimpleInjector
 
-    attachee = Attachee(args.pid)
-    pdb_client = Client()
-    pty = Pty()
+    if not command and not filename:
+        command = f'import sys; sys.path.insert(len(sys.path), ""); import rpdb; rpdb.set_trace("/tmp/debug-{pid}.unix")' # noqa
+        injector_cls = REPLInjector
 
-    exchange = Exchange()
-    exchange.attach(attachee)
-    exchange.attach(pdb_client)
-    exchange.attach(pty)
+    elif filename:
+        shutil.copy(filename, f'/proc/{pid}/cwd/')
+        command = f'import {filename}'
 
-    attachee.start_inject()
+    injector = injector_cls(pid, command)
+    injector.start()
     EventLoop().run()

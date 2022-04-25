@@ -26,6 +26,7 @@ setup(
     python_requires=">=3.8",
     install_requires=[
         "syscall@https://github.com/jschwinger233/py-linux-syscall/zipball/main#egg=syscall==0.0.2",
+        "click>=8.0.0,<9.0.0",
     ],
     entry_points={
         "console_scripts": [
