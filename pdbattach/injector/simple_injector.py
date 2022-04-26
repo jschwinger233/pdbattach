@@ -1,38 +1,38 @@
 import os
 import enum
-import time
 import copy
+import uuid
 import signal
-import shutil
 import selectors
+import contextlib
 
 import syscall
 
 from . import elf
-from ..rpdb import rpdb
 from .utils import pokebytes
 from ..eventloop import EventLoop
-from ..exchange import Exchange, message, Subscriber
 
 
 class State(enum.Enum):
     init = 0
-    call_PyGILState_Ensure = 1
-    syscall_mmap = 2
-    call_PyRun_SimpleStringFlags = 3
-    call_PyGILState_Release = 4
-    syscall_munmap = 5
-    restore_and_detach = 6
+    syscall_mmap = 1
+    call_PyGILState_Ensure = 2
+    probe_stack_offset = 3
+    call_PyRun_SimpleStringFlags = 4
+    call_PyGILState_Release = 5
+    syscall_munmap = 6
+    restore_and_detach = 7
 
 
-class Attachee(Subscriber):
-    ALLOCATE_SIZE_IN_BYTE = 1024
-
-    def __init__(self, pid: int):
+class SimpleInjector:
+    def __init__(self, pid: int, command: str):
         self.pid = pid
+        self.command = command
 
         self._signalfd = None
         self._state = 0
+        self._sentinel = f"/tmp/{uuid.uuid4()}"
+        self._new_frame_offset = 16
 
         self._offset_PyGILState_Ensure = elf.search_symbol_offset(
             pid, "PyGILState_Ensure"
@@ -44,7 +44,7 @@ class Attachee(Subscriber):
             pid, "PyGILState_Release"
         )
 
-    def start_inject(self):
+    def start(self):
         signal.pthread_sigmask(signal.SIG_BLOCK, [signal.SIGCHLD])
         self._signalfd = syscall.signalfd(
             -1,
@@ -58,14 +58,6 @@ class Attachee(Subscriber):
         )
 
         syscall.ptrace(syscall.PTRACE_ATTACH, self.pid, 0, 0)
-
-    def handle_general_signal(self, signo: int):
-        signame = signal.Signal(signo).name
-        print(f"got signal {signame}")
-
-    @property
-    def unix_address(self):
-        return f"/tmp/debug-{self.pid}.unix"
 
     def callback(self, fd):
         ssi = syscall.SignalfdSiginfo()
@@ -81,10 +73,14 @@ class Attachee(Subscriber):
 
         os.wait()
         call = getattr(self, "_do_" + State(self._state + 1).name)
-        call(fd)
-        self._state += 1
+        if call(fd):
+            self._state += 1
 
-    def _do_call_PyGILState_Ensure(self, fd):
+    def handle_general_signal(self, signo: int):
+        signame = signal.Signal(signo).name
+        print(f"got signal {signame}")
+
+    def _do_syscall_mmap(self, fd) -> bool:
         self._saved_regs = syscall.UserRegsStruct()
         syscall.ptrace(
             syscall.PTRACE_GETREGS, self.pid, 0, self._saved_regs.byref()
@@ -113,28 +109,11 @@ class Attachee(Subscriber):
             self._saved_regs.rip + 2,
             self._next_instruction & ~0xFF | 0xCC,  # int
         )
-        regs = copy.copy(self._saved_regs)
-        regs.rax = self._offset_PyGILState_Ensure
-        regs.rsp -= 152
-        regs.rbp = regs.rsp
-        syscall.ptrace(
-            syscall.PTRACE_SETREGS,
-            self.pid,
-            0,
-            regs.byref(),
-        )
-        syscall.ptrace(
-            syscall.PTRACE_CONT,
-            self.pid,
-            0,
-            0,
-        )
 
-    def _do_syscall_mmap(self, fd):
         regs = copy.copy(self._saved_regs)
         regs.rax = syscall.mmap.no
         regs.rdi = 0
-        regs.rsi = self.ALLOCATE_SIZE_IN_BYTE
+        regs.rsi = len(self.command) + 1
         regs.rdx = syscall.PROT_READ | syscall.PROT_WRITE
         regs.r10 = syscall.MAP_PRIVATE | syscall.MAP_ANONYMOUS
         regs.r8 = 0
@@ -152,22 +131,81 @@ class Attachee(Subscriber):
             0,
             0,
         )
+        return True
 
-    def _do_call_PyRun_SimpleStringFlags(self, fd):
+    def _do_call_PyGILState_Ensure(self, fd) -> bool:
         rregs = syscall.UserRegsStruct()
         syscall.ptrace(syscall.PTRACE_GETREGS, self.pid, 0, rregs.byref())
         self._allocated_address = rregs.rax
-        shutil.copy(rpdb.__file__, f"/proc/{self.pid}/cwd")
+
+        regs = copy.copy(self._saved_regs)
+        regs.rax = self._offset_PyGILState_Ensure
+        regs.rsp -= self._new_frame_offset
+        regs.rbp = regs.rsp
+        syscall.ptrace(
+            syscall.PTRACE_SETREGS,
+            self.pid,
+            0,
+            regs.byref(),
+        )
+        syscall.ptrace(
+            syscall.PTRACE_CONT,
+            self.pid,
+            0,
+            0,
+        )
+        return True
+
+    def _do_probe_stack_offset(self, fd) -> bool:
+
+        regs = copy.copy(self._saved_regs)
+
+        with contextlib.suppress(FileNotFoundError):
+            os.stat(f"/proc/{self.pid}/root/{self._sentinel}")
+
+            pokebytes(
+                self.pid,
+                self._allocated_address,
+                f"import os; os.remove('{self._sentinel}')".encode(),
+            )
+            regs.rax = self._offset_PyRun_SimpleStringFlags
+            regs.rdi = self._allocated_address
+            regs.rsi = 0
+            regs.rsp -= self._new_frame_offset
+            regs.rbp = regs.rsp
+            syscall.ptrace(syscall.PTRACE_SETREGS, self.pid, 0, regs.byref())
+            syscall.ptrace(syscall.PTRACE_CONT, self.pid, 0, 0)
+            return True
+
+        self._new_frame_offset += 8
+        if self._new_frame_offset > 8*50:
+            raise RuntimeError("valid new frame offset not found")
+
         pokebytes(
             self.pid,
             self._allocated_address,
-            f'import sys; sys.path.insert(0, ""); import rpdb; rpdb.set_trace("{self.unix_address}")'.encode(),  # noqa
+            f"import os; os.mknod('{self._sentinel}')".encode(),
+        )
+        regs.rax = self._offset_PyRun_SimpleStringFlags
+        regs.rdi = self._allocated_address
+        regs.rsi = 0
+        regs.rsp -= self._new_frame_offset
+        regs.rbp = regs.rsp
+        syscall.ptrace(syscall.PTRACE_SETREGS, self.pid, 0, regs.byref())
+        syscall.ptrace(syscall.PTRACE_CONT, self.pid, 0, 0)
+        return False
+
+    def _do_call_PyRun_SimpleStringFlags(self, fd) -> bool:
+        pokebytes(
+            self.pid,
+            self._allocated_address,
+            self.command.encode(),
         )
         regs = copy.copy(self._saved_regs)
         regs.rax = self._offset_PyRun_SimpleStringFlags
         regs.rdi = self._allocated_address
         regs.rsi = 0
-        regs.rsp -= 152
+        regs.rsp -= self._new_frame_offset
         regs.rbp = regs.rsp
         syscall.ptrace(
             syscall.PTRACE_SETREGS,
@@ -176,17 +214,13 @@ class Attachee(Subscriber):
             regs.byref(),
         )
         syscall.ptrace(syscall.PTRACE_CONT, self.pid, 0, 0)
+        return True
 
-        time.sleep(0.1)
-        Exchange().send(
-            message.RemotePdbUp(f"/proc/{self.pid}/root/{self.unix_address}")
-        )
-
-    def _do_call_PyGILState_Release(self, fd):
+    def _do_call_PyGILState_Release(self, fd) -> bool:
         regs = copy.copy(self._saved_regs)
         regs.rax = self._offset_PyGILState_Release
         regs.rdi = 0x1
-        regs.rsp -= 152  # magic
+        regs.rsp -= self._new_frame_offset
         regs.rbp = regs.rsp
         syscall.ptrace(
             syscall.PTRACE_SETREGS,
@@ -195,12 +229,13 @@ class Attachee(Subscriber):
             regs.byref(),
         )
         syscall.ptrace(syscall.PTRACE_CONT, self.pid, 0, 0)
+        return True
 
-    def _do_syscall_munmap(self, fd):
+    def _do_syscall_munmap(self, fd) -> bool:
         regs = copy.copy(self._saved_regs)
         regs.rax = syscall.munmap.no
         regs.rdi = self._allocated_address
-        regs.rsi = self.ALLOCATE_SIZE_IN_BYTE
+        regs.rsi = len(self.command) + 1
         regs.rdx = 0
         regs.r10 = 0
         regs.r8 = 0
@@ -218,8 +253,9 @@ class Attachee(Subscriber):
             0,
             0,
         )
+        return True
 
-    def _do_restore_and_detach(self, fd):
+    def _do_restore_and_detach(self, fd) -> True:
         syscall.ptrace(
             syscall.PTRACE_POKEDATA,
             self.pid,
@@ -242,3 +278,4 @@ class Attachee(Subscriber):
 
         eventloop = EventLoop()
         eventloop.unregister(self._signalfd)
+        return True

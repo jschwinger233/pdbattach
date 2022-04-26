@@ -10,6 +10,8 @@ python3.8 -mpip install git+https://github.com/jschwinger233/pdbattach.git
 
 ## Usage
 
+### interactive debugging using pdb
+
 Suppose we have a `python3.9` process running with command `python3.9 test.py`, where `test.py` is a simple script:
 
 ```python
@@ -41,8 +43,37 @@ Breakpoint 1 at /home/gray/Dropbox/mac.local/Documents/src/github.com/jschwinger
 (Pdb) q
 ```
 
+### inject any code snippets
+
+Suppose we have a simple HTTP server causing memory leak, and we want to use [memray](https://github.com/bloomberg/memray) to do a memory profile by attaching.
+
+Firstly let's enable the tracker:
+
+```bash
+sudo pdbattach -p $(pidof python3.9) -c 'import memray; global t; t = memray.Tracker("out.bin"); t.__enter__(); print(t)'
+```
+
+You can also put the statements in a script file and run by:
+
+```bash
+sudo pdbattach -p $(pidof python3.9) -f mem_track.py
+```
+
+Suppose the output of the above injection is:
+
+```
+Memray WARNING: Correcting symbol for malloc from 0x421420 to 0x7f0400389110
+Memray WARNING: Correcting symbol for free from 0x421890 to 0x7f0400389700
+<memray._memray.Tracker object at 0x7f03ff6598d0>
+```
+
+Then after a while, stop the tracker and inspect the outcomes:
+
+```bash
+sudo pdbattach -p $(pidof python3.9) -c 'import ctypes; ctypes.cast(0x7f13e332f1d0, ctypes.py_object).value.__exit__(None, None, None)'
+```
+
 ## Known Issues
 
 1. pdb doesn't work properly under multi-thread scenarios. See [issue](https://bugs.python.org/issue41571).
 2. ptrace(2) relies on `struct user_regs_struct` whose definition varies across platforms, therefore running pdbattach inside a container (e.g. from docker.io/python:3 image) to attach a host process will cause segmentation fault. See [issue](https://github.com/jschwinger233/pdbattach/issues/4).
-3. Current version doesn't apply dynamic symbol reloc algorithm, therefore attaching a Python process whose executable is built from source will cause segmentation fault. See [issue](https://github.com/jschwinger233/pdbattach/issues/3).

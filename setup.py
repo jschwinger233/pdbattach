@@ -3,11 +3,15 @@ from setuptools import setup, find_packages
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
+g = {}
+with open("pdbattach/__version__.py") as f:
+    exec(f.read(), g, g)
+
 setup(
     name="pdbattach",
     packages=find_packages(),
     include_package_data=True,
-    version="0.0.4",
+    version=g["version"],
     license="MIT",
     description="pdb attach a Python process",
     long_description=long_description,
@@ -26,6 +30,7 @@ setup(
     python_requires=">=3.8",
     install_requires=[
         "syscall@https://github.com/jschwinger233/py-linux-syscall/zipball/main#egg=syscall==0.0.2",
+        "click>=8.0.0,<9.0.0",
     ],
     entry_points={
         "console_scripts": [
