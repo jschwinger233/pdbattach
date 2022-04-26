@@ -16,18 +16,11 @@ class REPLInjector(SimpleInjector):
         exchange.attach(Client())
         exchange.attach(Pty())
 
-    def _do_call_PyRun_SimpleStringFlags1(self, fd):
+    def _do_call_PyRun_SimpleStringFlags(self, fd):
         shutil.copy(rpdb.__file__, f"/proc/{self.pid}/cwd")
-        super()._do_call_PyRun_SimpleStringFlags1(fd)
+        super()._do_call_PyRun_SimpleStringFlags(fd)
         time.sleep(0.1)
         Exchange().send(
             message.RemotePdbUp(f"/proc/{self.pid}/root/tmp/debug-{self.pid}.unix") # noqa
         )
-        print('sent')
-
-    def _do_call_PyRun_SimpleStringFlags2(self, fd):
-        super()._do_call_PyRun_SimpleStringFlags2(fd)
-        time.sleep(0.1)
-        Exchange().send(
-            message.RemotePdbUp(f"/proc/{self.pid}/root/tmp/debug-{self.pid}.unix") # noqa
-        )
+        return True
