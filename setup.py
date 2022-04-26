@@ -3,11 +3,15 @@ from setuptools import setup, find_packages
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
+g = {}
+with open("pdbattach/__version__.py") as f:
+    exec(f.read(), g, g)
+
 setup(
     name="pdbattach",
     packages=find_packages(),
     include_package_data=True,
-    version="0.0.4",
+    version=g["version"],
     license="MIT",
     description="pdb attach a Python process",
     long_description=long_description,

@@ -26,7 +26,18 @@ from .eventloop import EventLoop
     help="the script to inject, e.g. -f evil.py",
     type=click.Path(exists=True, dir_okay=False),
 )
-def main(pid: int, command: str, filename: str):
+@click.option(
+    "-v",
+    "--version",
+    help="show the version",
+    is_flag=True,
+)
+def main(pid: int, command: str, filename: str, version: bool):
+    if version:
+        from .__version__ import version
+        print(version)
+        return
+
     injector_cls = SimpleInjector
 
     if not command and not filename:
