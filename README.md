@@ -70,7 +70,7 @@ Memray WARNING: Correcting symbol for free from 0x421890 to 0x7f0400389700
 Then after a while, stop the tracker and inspect the outcomes:
 
 ```bash
-sudo pdbattach -p $(pidof python3.9) -c 'import ctypes; ctypes.cast(0x7f13e332f1d0, ctypes.py_object).value.__exit__(None, None, None)'
+sudo pdbattach -p $(pidof python3.9) -c 'import ctypes; ctypes.cast(0x7f03ff6598d0, ctypes.py_object).value.__exit__(None, None, None)'
 ```
 
 ## Known Issues
