@@ -113,7 +113,7 @@ class SimpleInjector:
         regs = copy.copy(self._saved_regs)
         regs.rax = syscall.mmap.no
         regs.rdi = 0
-        regs.rsi = 1024  # todo
+        regs.rsi = len(self.command) + 1
         regs.rdx = syscall.PROT_READ | syscall.PROT_WRITE
         regs.r10 = syscall.MAP_PRIVATE | syscall.MAP_ANONYMOUS
         regs.r8 = 0
@@ -235,7 +235,7 @@ class SimpleInjector:
         regs = copy.copy(self._saved_regs)
         regs.rax = syscall.munmap.no
         regs.rdi = self._allocated_address
-        regs.rsi = 1024
+        regs.rsi = len(self.command) + 1
         regs.rdx = 0
         regs.r10 = 0
         regs.r8 = 0

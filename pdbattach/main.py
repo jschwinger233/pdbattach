@@ -30,12 +30,15 @@ def main(pid: int, command: str, filename: str):
     injector_cls = SimpleInjector
 
     if not command and not filename:
-        command = f'import sys; sys.path.insert(len(sys.path), ""); import rpdb; rpdb.set_trace("/tmp/debug-{pid}.unix")' # noqa
+        command = f'import sys; sys.path.insert(len(sys.path), ""); import rpdb; rpdb.set_trace("/tmp/debug-{pid}.unix")'  # noqa
         injector_cls = REPLInjector
 
     elif filename:
-        shutil.copy(filename, f'/proc/{pid}/cwd/')
-        command = f'import {filename}'
+        if not filename.endswith(".py"):
+            raise ValueError('filename must endwith ".py"')
+
+        shutil.copy(filename, f"/proc/{pid}/cwd/")
+        command = f"import {filename[:-3]}"
 
     injector = injector_cls(pid, command)
     injector.start()
