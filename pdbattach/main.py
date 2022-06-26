@@ -14,6 +14,7 @@ from .eventloop import EventLoop
     "--pid",
     help="the Python process to tamper",
     type=int,
+    required=True,
 )
 @click.option(
     "-c",
