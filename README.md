@@ -10,6 +10,30 @@ python3.8 -mpip install git+https://github.com/jschwinger233/pdbattach.git
 
 ## Usage
 
+### check process stack
+
+```
+sudo pdbattach -p $pid -c 'import traceback; f=open("/tmp/bt", "w+"); print("".join(traceback.format_stack()), file=f, flush=True); f.close()'
+```
+
+Then you will find the process's stack backtrace at `/tmp/bt` like:
+
+```
+  File "/usr/lib/python3.8/runpy.py", line 194, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/usr/lib/python3.8/runpy.py", line 87, in _run_code
+    exec(code, run_globals)
+  File "/usr/lib/python3.8/http/server.py", line 1294, in <module>
+    test(
+  File "/usr/lib/python3.8/http/server.py", line 1257, in test
+    httpd.serve_forever()
+  File "/usr/lib/python3.8/socketserver.py", line 232, in serve_forever
+    ready = selector.select(poll_interval)
+  File "/usr/lib/python3.8/selectors.py", line 415, in select
+    fd_event_list = self._selector.poll(timeout)
+  File "<string>", line 1, in <module>
+```
+
 ### interactive debugging using pdb
 
 Suppose we have a `python3.9` process running with command `python3.9 test.py`, where `test.py` is a simple script:
@@ -24,7 +48,7 @@ for i in range(1000):
 then we can attach it:
 
 ```bash
-$ sudo pdbattach $(pgrep -f test.py)
+$ sudo pdbattach -p $(pgrep -f test.py)
 --Return--
 > <string>(1)<module>()->None
 (Pdb) b test.py:3
