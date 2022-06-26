@@ -14,7 +14,6 @@ from .eventloop import EventLoop
     "--pid",
     help="the Python process to tamper",
     type=int,
-    required=True,
 )
 @click.option(
     "-c",
@@ -33,11 +32,17 @@ from .eventloop import EventLoop
     help="show the version",
     is_flag=True,
 )
-def main(pid: int, command: str, filename: str, version: bool):
+@click.pass_context
+def main(ctx, pid: int, command: str, filename: str, version: bool):
     if version:
-        from .__version__ import version
-        print(version)
+        from . import __version__
+
+        print(__version__)
         return
+    else:
+        if not pid:
+            click.echo(ctx.get_help())
+            return
 
     injector_cls = SimpleInjector
 

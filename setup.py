@@ -4,14 +4,14 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 g = {}
-with open("pdbattach/__version__.py") as f:
+with open("pdbattach/__init__.py") as f:
     exec(f.read(), g, g)
 
 setup(
     name="pdbattach",
     packages=find_packages(),
     include_package_data=True,
-    version=g["version"],
+    version=g["__version__"],
     license="MIT",
     description="pdb attach a Python process",
     long_description=long_description,
